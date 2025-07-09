@@ -190,7 +190,7 @@ def attitudeVectorToMatrix(m, useQuaternion, seq):
 
 
 
-def get_matrix(CalPose, ToolPose):
+def get_matrix(CalPose, ToolPose, select_mode, mode):
 	R_gripper2base = [] # Use Python lists
 	t_gripper2base = []
 	R_target2cam = []
@@ -210,12 +210,16 @@ def get_matrix(CalPose, ToolPose):
 		R_target2cam.append(tempR)
 		t_target2cam.append(tempT)
 	for i in range(num_images): # //计算机械臂位姿
-		tmp = attitudeVectorToMatrix(ToolPose[i:i+1, :], True, "") # Pass the i-th row as a 1x7 matrix
+		# 眼在手上
+		matrix = attitudeVectorToMatrix(ToolPose[i:i+1, :], True, "") # Pass the i-th row as a 1x7 matrix
 		'''
-		如果是 "眼在手外"（相机固定），请取消下面一行注释
+		如果是 "眼在手外"(相机固定)
 		以将 Gripper 到 Base 的变换取逆，变为 Base 到 Gripper
 		'''
-		#tmp = np.linalg.inv(tmp)  # Base → Gripper
+		if select_mode == mode[0]:
+			tmp = matrix
+		elif select_mode == mode[1]:
+			tmp = np.linalg.inv(matrix)  # Base → Gripper
 
 		vecHb.append(tmp)
 		tempR, tempT = RT2R_T(tmp) 
@@ -240,25 +244,27 @@ def get_matrix(CalPose, ToolPose):
 	print(np.linalg.inv(Hcb) @ np.linalg.inv(vecHb[1]) @ vecHb[0] @ Hcb @ vecHc[0], "\n") # //用手眼系统预测第一组数据中标定板相对相机的位姿，是否与vecHc[1]相同
 	print("----手眼系统测试----") # //----手眼系统测试----
 	print("机械臂下标定板XYZ为：") # //机械臂下标定板XYZ为：
-	for i in range(len(vecHc)):
-		#cheesePos = np.array([[0.0], [0.0], [0.0], [1.0]], dtype=np.float64) # 4x1 matrix
-		#worldPos = vecHb[i] @ Hcb @ vecHc[i] @ cheesePos
-		worldPos = vecHb[i] @ Hcb @ vecHc[i]
-		print(f"第{i}组计算出的标定板在世界坐标系中的位姿：")
-		print(worldPos)
 
-	'''for i in range(len(vecHc)):
-		H_base2target = vecHb[i] @ Hcb @ vecHc[i]
-		print(f"第 {i} 组计算出的标定板在世界坐标系中的位姿：")
-		print(H_base2target)'''
+	if select_mode == mode[0]:
+		for i in range(len(vecHc)):
+			worldPos = vecHb[i] @ Hcb @ vecHc[i]
+			print(f"第{i}组计算出的标定板在世界坐标系中的位姿：")
+			print(worldPos)
 
-	print("Press Enter to exit...")
-	sys.stdin.readline() 
+	elif select_mode == mode[1]:
+		for i in range(len(vecHc)):
+			H_base2target = vecHb[i] @ Hcb @ vecHc[i]
+			print(f"第 {i} 组计算出的标定板在世界坐标系中的位姿：")
+			print(H_base2target)
 	
 	return Hcb
 
 
 if __name__ == "__main__":
+
+	mode = ["Eye in Hand","Eye to Hand"]
+	select_mode = mode[1]
+
 	# 连接机械臂
 	CalPose = []
 	ToolPose = []
@@ -317,11 +323,31 @@ if __name__ == "__main__":
 	print("机械臂末端在基座下的位姿：")
 	print(ToolPose)
 
-	with open('Poses.json', 'w') as f:
-		json.dump({
-			'CalPose': CalPose,
-			'ToolPose': ToolPose
-		}, f)
+	if select_mode == mode[0]:
+		with open('in_Poses.json', 'w') as f:
+			json.dump({
+				'CalPose': CalPose,
+				'ToolPose': ToolPose
+			}, f)
+
+		with open('in_Poses.json','r') as f:
+			data = json.load(f)
+
+	elif select_mode == mode[1]:
+		with open('to_Poses.json', 'w') as f:
+			json.dump({
+				'CalPose': CalPose,
+				'ToolPose': ToolPose
+			}, f)
+
+		with open('to_Poses.json','r') as f:
+			data = json.load(f)
+	else:
+		print("请正确选择模式!")
+		sys.exit(0)
+	
+	CalPose = data['CalPose']
+	ToolPose = data['ToolPose']
 
 	for i in range(len(CalPose)):
 		cal = CalPose[i]
@@ -345,5 +371,7 @@ if __name__ == "__main__":
 	print(ToolPose)
 
 	# 计算手眼标定矩阵
-	matrix = get_matrix(CalPose, ToolPose)
+	matrix = get_matrix(CalPose, ToolPose, select_mode, mode)
 	print(matrix)
+
+
