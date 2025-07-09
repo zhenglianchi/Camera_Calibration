@@ -7,8 +7,7 @@ import cv2
 # 提示没有aruco的看问题汇总
 import cv2.aruco as aruco
 from UR_Base import UR_BASE
-import time
-
+import json
 
 # 配置摄像头与开启pipeline
 pipeline = rs.pipeline()
@@ -276,7 +275,7 @@ if __name__ == "__main__":
 		corners, ids, rejected_img_points = aruco.detectMarkers(rgb, aruco_dict, parameters=parameters,cameraMatrix=intr_matrix, distCoeff=intr_coeffs)
 
 		# aruco码的边长，单位是米
-		rvec, tvec, markerPoints = aruco.estimatePoseSingleMarkers(corners, 0.095, intr_matrix, intr_coeffs)
+		rvec, tvec, markerPoints = aruco.estimatePoseSingleMarkers(corners, 0.094, intr_matrix, intr_coeffs)
 
 		key = cv2.waitKey(1)
 		# 按键盘q退出程序
@@ -289,6 +288,7 @@ if __name__ == "__main__":
 			print("Corners:\n", corners)
 			print("Rvec:\n", rvec)
 			print("Tvec:\n", tvec)
+			print(len(ToolPose), len(CalPose))
 			# 在图片上标出aruco码的位置
 			aruco.drawDetectedMarkers(rgb, corners)
 			# 根据aruco码的位姿标注出对应的xyz轴, 0.05对应length参数，代表xyz轴画出来的长度 
@@ -316,6 +316,12 @@ if __name__ == "__main__":
 	print(CalPose)
 	print("机械臂末端在基座下的位姿：")
 	print(ToolPose)
+
+	with open('Poses.json', 'w') as f:
+		json.dump({
+			'CalPose': CalPose,
+			'ToolPose': ToolPose
+		}, f)
 
 	for i in range(len(CalPose)):
 		cal = CalPose[i]
